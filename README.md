@@ -1,1 +1,1 @@
-docker_metrica_config
+Конфигурация для сбора метрик с docker контейнеров mysql(master/2slaves)
