@@ -1,0 +1,129 @@
+version: '3.8'
+volumes:
+  grafana_data: {}
+  
+services:
+  mysql:
+    image: mysql:5.7
+    env_file:
+      - ./master/mysql_master.env
+    container_name: "mysql"
+    restart: "no"  
+    ports:
+      - 4406:3306
+    environment:
+      mysql_root_password: 111
+      mysql_database: mydb
+      mysql_user: root
+      mysql_password: 111
+    volumes:
+      - ./master/conf/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./master/data:/var/lib/mysql
+   
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    expose: [ "9090" ]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: 
+      - --config.file=/etc/prometheus/prometheus.yml
+    labels:
+        org.label-schema.group: "monitoring"
+    depends_on:
+    - cadvisor  
+      
+  grafana:
+    image: grafana/grafana:7.3.6
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    depends_on:
+    - prometheus
+    ports:
+      - '3001:3000'
+    labels:
+      org.label-schema.group: "monitoring"
+      
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+    - 8080:8080
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro   
+      
+
+  mysql_slave1:
+    image: mysql:5.7
+    env_file:
+      - ./slave/mysql_slave.env
+    container_name: "mysql_slave1"
+    restart: "no"
+    ports:
+      - 5506:3306
+    depends_on:
+      - mysql
+    volumes:
+      - ./slave/conf/mysql1.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./slave/data1:/var/lib/mysql
+
+  mysql_slave2:
+    image: mysql:5.7
+    env_file:
+      - ./slave/mysql_slave.env
+    container_name: "mysql_slave2"
+    restart: "no"
+    ports:
+      - 5507:3306
+    depends_on:
+      - mysql
+    volumes:
+      - ./slave/conf/mysql2.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./slave/data2:/var/lib/mysql
+
+  
+  # mysql-exporter:
+    # image: prom/mysqld-exporter
+    # ports:
+      # - 9104:9104
+    # # volumes:
+     # # - /home/mostafa/desktop/docker_lab/mysql/mysql-exporter/.my.cnf:/root/.my.cnf
+    # environment: 
+      # - DATA_SOURCE_NAME=root:111@(mysql:3306)/mydb
+    # links: 
+      # - 'mysql'
+      
+  # node-exporter:
+    # image: prom/node-exporter:v1.0.1
+    # container_name: node-exporter
+    # volumes:
+      # - /proc:/host/proc:ro
+      # - /sys:/host/sys:ro
+      # - /:/rootfs:ro
+    # command:
+      # - '--path.procfs=/host/proc'
+      # - '--path.rootfs=/rootfs'
+      # - '--path.sysfs=/host/sys'
+      # - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)'
+      # - '--collector.supervisord'
+    # restart: unless-stopped
+    # expose:
+      # - 9100
+    # ports:
+      # - 9100:9100
+    # labels:
+      # org.label-schema.group: "monitoring"
+    # networks:
+        # - docker-mysql1-monitor-net
